@@ -117,10 +117,7 @@ export function TodoItem({ todo, onToggle, onDelete }: TodoItemProps) {
           type="backgroundElement"
           style={[
             styles.card,
-            {
-              borderColor: theme.border,
-              opacity: todo.completed ? 0.85 : 1,
-            },
+            { borderColor: theme.border },
           ]}>
           <Pressable
             onPress={handleToggle}
@@ -139,7 +136,7 @@ export function TodoItem({ todo, onToggle, onDelete }: TodoItemProps) {
               {todo.completed && <ThemedText style={styles.checkmark}>✓</ThemedText>}
             </View>
 
-            <View style={styles.contentColumn}>
+            <View style={[styles.contentColumn, todo.completed && styles.completedContent]}>
               <ThemedText
                 style={[
                   styles.title,
@@ -239,6 +236,9 @@ const styles = StyleSheet.create({
   contentColumn: {
     flex: 1,
     gap: Spacing.one,
+  },
+  completedContent: {
+    opacity: 0.6,
   },
   title: {
     fontSize: 16,
