@@ -5,7 +5,9 @@ const { getDefaultConfig } = require('expo/metro-config');
 const config = getDefaultConfig(__dirname);
 
 // Add wasm asset support for expo-sqlite on web
-config.resolver.assetExts.push('wasm');
+if (!config.resolver.assetExts.includes('wasm')) {
+  config.resolver.assetExts.push('wasm');
+}
 
 // Add COEP and COOP headers to support SharedArrayBuffer for expo-sqlite on web
 config.server.enhanceMiddleware = (middleware) => {

@@ -1,5 +1,13 @@
 import * as SQLite from 'expo-sqlite';
-import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import React, {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import { Platform } from 'react-native';
 
 export type TodoPriority = 'low' | 'medium' | 'high';
@@ -172,12 +180,21 @@ const TodoContext = createContext<TodoContextValue | null>(null);
 
 export function TodoProvider({ children }: { children: React.ReactNode }) {
   const [todos, setTodos] = useState<Todo[]>(INITIAL_TODOS);
+  const todosRef = useRef(INITIAL_TODOS);
   const [isLoaded, setIsLoaded] = useState(false);
+
+  const updateTodos = useCallback((update: (current: Todo[]) => Todo[]) => {
+    const next = update(todosRef.current);
+    todosRef.current = next;
+    setTodos(next);
+    syncWebStorage(next);
+  }, []);
 
   useEffect(() => {
     let mounted = true;
     initAndLoadTodos().then((loaded) => {
       if (!mounted) return;
+      todosRef.current = loaded;
       setTodos(loaded);
       setIsLoaded(true);
     });
@@ -199,11 +216,7 @@ export function TodoProvider({ children }: { children: React.ReactNode }) {
         createdAt: Date.now(),
       };
 
-      setTodos((prev) => {
-        const next = [newTodo, ...prev];
-        syncWebStorage(next);
-        return next;
-      });
+      updateTodos((current) => [newTodo, ...current]);
 
       if (Platform.OS !== 'web') {
         getDatabase()
@@ -223,69 +236,68 @@ export function TodoProvider({ children }: { children: React.ReactNode }) {
           .catch((err) => console.warn('Failed to insert todo into SQLite:', err));
       }
     },
-    []
+    [updateTodos]
   );
 
-  const toggleTodo = useCallback((id: string) => {
-    let toggledCompleted = false;
-    let toggledCompletedAt: number | null = null;
+  const toggleTodo = useCallback(
+    (id: string) => {
+      const currentTodo = todosRef.current.find((todo) => todo.id === id);
+      if (!currentTodo) return;
 
-    setTodos((prev) => {
-      const next = prev.map((todo) => {
-        if (todo.id !== id) return todo;
-        toggledCompleted = !todo.completed;
-        toggledCompletedAt = toggledCompleted ? Date.now() : null;
-        return {
-          ...todo,
-          completed: toggledCompleted,
-          completedAt: toggledCompletedAt ?? undefined,
-        };
-      });
-      syncWebStorage(next);
-      return next;
-    });
-
-    if (Platform.OS !== 'web') {
-      getDatabase()
-        .then((db) =>
-          db.runAsync(
-            'UPDATE todos SET completed = ?, completed_at = ? WHERE id = ?',
-            toggledCompleted ? 1 : 0,
-            toggledCompletedAt,
-            id
+      const completed = !currentTodo.completed;
+      const completedAt = completed ? Date.now() : null;
+      updateTodos((current) =>
+        current.map((todo) =>
+          todo.id === id
+            ? {
+                ...todo,
+                completed,
+                completedAt: completedAt ?? undefined,
+              }
+            : todo
           )
-        )
-        .catch((err) => console.warn('Failed to toggle todo in SQLite:', err));
-    }
-  }, []);
+        );
 
-  const deleteTodo = useCallback((id: string) => {
-    setTodos((prev) => {
-      const next = prev.filter((todo) => todo.id !== id);
-      syncWebStorage(next);
-      return next;
-    });
+      if (Platform.OS !== 'web') {
+        getDatabase()
+          .then((db) =>
+            db.runAsync(
+              'UPDATE todos SET completed = ?, completed_at = ? WHERE id = ?',
+              completed ? 1 : 0,
+              completedAt,
+              id
+            )
+          )
+          .catch((err) => console.warn('Failed to toggle todo in SQLite:', err));
+      }
+    },
+    [updateTodos]
+  );
 
-    if (Platform.OS !== 'web') {
-      getDatabase()
-        .then((db) => db.runAsync('DELETE FROM todos WHERE id = ?', id))
-        .catch((err) => console.warn('Failed to delete todo from SQLite:', err));
-    }
-  }, []);
+  const deleteTodo = useCallback(
+    (id: string) => {
+      if (!todosRef.current.some((todo) => todo.id === id)) return;
+      updateTodos((current) => current.filter((todo) => todo.id !== id));
+
+      if (Platform.OS !== 'web') {
+        getDatabase()
+          .then((db) => db.runAsync('DELETE FROM todos WHERE id = ?', id))
+          .catch((err) => console.warn('Failed to delete todo from SQLite:', err));
+      }
+    },
+    [updateTodos]
+  );
 
   const clearCompleted = useCallback(() => {
-    setTodos((prev) => {
-      const next = prev.filter((todo) => !todo.completed);
-      syncWebStorage(next);
-      return next;
-    });
+    if (!todosRef.current.some((todo) => todo.completed)) return;
+    updateTodos((current) => current.filter((todo) => !todo.completed));
 
     if (Platform.OS !== 'web') {
       getDatabase()
         .then((db) => db.runAsync('DELETE FROM todos WHERE completed = 1'))
         .catch((err) => console.warn('Failed to clear completed todos from SQLite:', err));
     }
-  }, []);
+  }, [updateTodos]);
 
   const activeTodos = useMemo(() => todos.filter((todo) => !todo.completed), [todos]);
   const completedTodos = useMemo(
