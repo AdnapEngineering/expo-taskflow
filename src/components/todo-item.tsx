@@ -1,5 +1,7 @@
+import * as Haptics from 'expo-haptics';
 import React from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
+import Animated, { FadeInDown, FadeOutRight, LinearTransition } from 'react-native-reanimated';
 
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
@@ -23,73 +25,89 @@ export function TodoItem({ todo, onToggle, onDelete }: TodoItemProps) {
   const theme = useTheme();
   const priorityStyle = PRIORITY_COLORS[todo.priority];
 
+  const handleToggle = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    onToggle(todo.id);
+  };
+
+  const handleDelete = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    onDelete(todo.id);
+  };
+
   return (
-    <ThemedView
-      type="backgroundElement"
-      style={[
-        styles.card,
-        {
-          borderColor: theme.border,
-          opacity: todo.completed ? 0.85 : 1,
-        },
-      ]}>
-      <Pressable
-        onPress={() => onToggle(todo.id)}
-        accessibilityRole="checkbox"
-        accessibilityState={{ checked: todo.completed }}
-        accessibilityLabel={`Mark "${todo.title}" as ${todo.completed ? 'incomplete' : 'complete'}`}
-        style={({ pressed }) => [styles.mainTouchArea, pressed && styles.pressed]}>
-        <View
-          style={[
-            styles.checkbox,
-            todo.completed
-              ? { backgroundColor: theme.accent, borderColor: theme.accent }
-              : { borderColor: theme.textSecondary, backgroundColor: theme.background },
-          ]}>
-          {todo.completed && <ThemedText style={styles.checkmark}>✓</ThemedText>}
-        </View>
-
-        <View style={styles.contentColumn}>
-          <ThemedText
+    <Animated.View
+      entering={FadeInDown}
+      exiting={FadeOutRight}
+      layout={LinearTransition}>
+      <ThemedView
+        type="backgroundElement"
+        style={[
+          styles.card,
+          {
+            borderColor: theme.border,
+            opacity: todo.completed ? 0.85 : 1,
+          },
+        ]}>
+        <Pressable
+          onPress={handleToggle}
+          hitSlop={12}
+          accessibilityRole="checkbox"
+          accessibilityState={{ checked: todo.completed }}
+          accessibilityLabel={`Mark "${todo.title}" as ${todo.completed ? 'incomplete' : 'complete'}`}
+          style={({ pressed }) => [styles.mainTouchArea, pressed && styles.pressed]}>
+          <View
             style={[
-              styles.title,
-              todo.completed && {
-                textDecorationLine: 'line-through',
-                color: theme.textSecondary,
-              },
+              styles.checkbox,
+              todo.completed
+                ? { backgroundColor: theme.accent, borderColor: theme.accent }
+                : { borderColor: theme.textSecondary, backgroundColor: theme.background },
             ]}>
-            {todo.title}
-          </ThemedText>
+            {todo.completed && <ThemedText style={styles.checkmark}>✓</ThemedText>}
+          </View>
 
-          <View style={styles.metaRow}>
-            <View style={[styles.categoryPill, { backgroundColor: theme.accentSoft }]}>
-              <ThemedText style={[styles.categoryText, { color: theme.accent }]}>
-                {todo.category}
-              </ThemedText>
-            </View>
+          <View style={styles.contentColumn}>
+            <ThemedText
+              style={[
+                styles.title,
+                todo.completed && {
+                  textDecorationLine: 'line-through',
+                  color: theme.textSecondary,
+                },
+              ]}>
+              {todo.title}
+            </ThemedText>
 
-            <View style={[styles.priorityPill, { backgroundColor: priorityStyle.bg }]}>
-              <ThemedText style={[styles.priorityText, { color: priorityStyle.text }]}>
-                {priorityStyle.label}
-              </ThemedText>
+            <View style={styles.metaRow}>
+              <View style={[styles.categoryPill, { backgroundColor: theme.accentSoft }]}>
+                <ThemedText style={[styles.categoryText, { color: theme.accent }]}>
+                  {todo.category}
+                </ThemedText>
+              </View>
+
+              <View style={[styles.priorityPill, { backgroundColor: priorityStyle.bg }]}>
+                <ThemedText style={[styles.priorityText, { color: priorityStyle.text }]}>
+                  {priorityStyle.label}
+                </ThemedText>
+              </View>
             </View>
           </View>
-        </View>
-      </Pressable>
+        </Pressable>
 
-      <Pressable
-        onPress={() => onDelete(todo.id)}
-        hitSlop={10}
-        accessibilityRole="button"
-        accessibilityLabel={`Delete "${todo.title}"`}
-        style={({ pressed }) => [
-          styles.deleteButton,
-          { backgroundColor: theme.backgroundSelected },
-          pressed && styles.pressed,
-        ]}>
-        <ThemedText style={[styles.deleteIcon, { color: theme.textSecondary }]}>✕</ThemedText>
-      </Pressable>
-    </ThemedView>
+        <Pressable
+          onPress={handleDelete}
+          hitSlop={12}
+          accessibilityRole="button"
+          accessibilityLabel={`Delete "${todo.title}"`}
+          style={({ pressed }) => [
+            styles.deleteButton,
+            { backgroundColor: theme.backgroundSelected },
+            pressed && styles.pressed,
+          ]}>
+          <ThemedText style={[styles.deleteIcon, { color: theme.textSecondary }]}>✕</ThemedText>
+        </Pressable>
+      </ThemedView>
+    </Animated.View>
   );
 }
 
