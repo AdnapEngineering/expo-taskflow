@@ -1,6 +1,6 @@
 import * as Haptics from 'expo-haptics';
 import React, { useRef } from 'react';
-import { Pressable, StyleSheet, View } from 'react-native';
+import { Platform, Pressable, StyleSheet, View } from 'react-native';
 import Swipeable, {
   SwipeDirection,
   type SwipeableMethods,
@@ -31,12 +31,24 @@ export function TodoItem({ todo, onToggle, onDelete }: TodoItemProps) {
   const swipeableRef = useRef<SwipeableMethods>(null);
 
   const handleToggle = () => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    const feedback =
+      Platform.OS === 'android'
+        ? Haptics.performAndroidHapticsAsync(
+            todo.completed
+              ? Haptics.AndroidHaptics.Toggle_Off
+              : Haptics.AndroidHaptics.Toggle_On
+          )
+        : Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    void feedback.catch((error) => console.warn('Failed to provide toggle haptic feedback:', error));
     onToggle(todo.id);
   };
 
   const handleDelete = () => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    const feedback =
+      Platform.OS === 'android'
+        ? Haptics.performAndroidHapticsAsync(Haptics.AndroidHaptics.Confirm)
+        : Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    void feedback.catch((error) => console.warn('Failed to provide delete haptic feedback:', error));
     onDelete(todo.id);
   };
 
