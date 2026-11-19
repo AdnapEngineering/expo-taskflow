@@ -1,5 +1,11 @@
-import React from 'react';
+import * as Haptics from 'expo-haptics';
+import React, { useRef } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
+import Swipeable, {
+  SwipeDirection,
+  type SwipeableMethods,
+} from 'react-native-gesture-handler/ReanimatedSwipeable';
+import Animated, { FadeInDown, FadeOutRight, LinearTransition } from 'react-native-reanimated';
 
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
@@ -22,78 +28,173 @@ interface TodoItemProps {
 export function TodoItem({ todo, onToggle, onDelete }: TodoItemProps) {
   const theme = useTheme();
   const priorityStyle = PRIORITY_COLORS[todo.priority];
+  const swipeableRef = useRef<SwipeableMethods>(null);
+
+  const handleToggle = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    onToggle(todo.id);
+  };
+
+  const handleDelete = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    onDelete(todo.id);
+  };
+
+  const renderLeftActions = (
+    _progress: unknown,
+    _translation: unknown,
+    swipeableMethods: SwipeableMethods
+  ) => (
+    <Pressable
+      onPress={() => {
+        handleToggle();
+        swipeableMethods.close();
+      }}
+      style={[
+        styles.swipeAction,
+        styles.leftAction,
+        { backgroundColor: todo.completed ? '#F59E0B' : '#10B981' },
+      ]}>
+      <ThemedText style={styles.swipeActionText}>
+        {todo.completed ? '↩ Undo' : '✓ Done'}
+      </ThemedText>
+    </Pressable>
+  );
+
+  const renderRightActions = (
+    _progress: unknown,
+    _translation: unknown,
+    swipeableMethods: SwipeableMethods
+  ) => (
+    <Pressable
+      onPress={() => {
+        swipeableMethods.close();
+        handleDelete();
+      }}
+      style={[styles.swipeAction, styles.rightAction, { backgroundColor: '#EF4444' }]}>
+      <ThemedText style={styles.swipeActionText}>✕ Delete</ThemedText>
+    </Pressable>
+  );
+
+  const handleSwipeableOpen = (direction: SwipeDirection) => {
+    if (direction === SwipeDirection.RIGHT) {
+      handleToggle();
+      swipeableRef.current?.close();
+    } else if (direction === SwipeDirection.LEFT) {
+      handleDelete();
+    }
+  };
 
   return (
-    <ThemedView
-      type="backgroundElement"
-      style={[
-        styles.card,
-        {
-          borderColor: theme.border,
-          opacity: todo.completed ? 0.85 : 1,
-        },
-      ]}>
-      <Pressable
-        onPress={() => onToggle(todo.id)}
-        accessibilityRole="checkbox"
-        accessibilityState={{ checked: todo.completed }}
-        accessibilityLabel={`Mark "${todo.title}" as ${todo.completed ? 'incomplete' : 'complete'}`}
-        style={({ pressed }) => [styles.mainTouchArea, pressed && styles.pressed]}>
-        <View
+    <Animated.View
+      entering={FadeInDown}
+      exiting={FadeOutRight}
+      layout={LinearTransition}>
+      <Swipeable
+        ref={swipeableRef}
+        friction={2}
+        leftThreshold={48}
+        rightThreshold={48}
+        overshootLeft={false}
+        overshootRight={false}
+        renderLeftActions={renderLeftActions}
+        renderRightActions={renderRightActions}
+        onSwipeableOpen={handleSwipeableOpen}
+        containerStyle={styles.swipeContainer}>
+        <ThemedView
+          type="backgroundElement"
           style={[
-            styles.checkbox,
-            todo.completed
-              ? { backgroundColor: theme.accent, borderColor: theme.accent }
-              : { borderColor: theme.textSecondary, backgroundColor: theme.background },
+            styles.card,
+            {
+              borderColor: theme.border,
+              opacity: todo.completed ? 0.85 : 1,
+            },
           ]}>
-          {todo.completed && <ThemedText style={styles.checkmark}>✓</ThemedText>}
-        </View>
+          <Pressable
+            onPress={handleToggle}
+            hitSlop={12}
+            accessibilityRole="checkbox"
+            accessibilityState={{ checked: todo.completed }}
+            accessibilityLabel={`Mark "${todo.title}" as ${todo.completed ? 'incomplete' : 'complete'}`}
+            style={({ pressed }) => [styles.mainTouchArea, pressed && styles.pressed]}>
+            <View
+              style={[
+                styles.checkbox,
+                todo.completed
+                  ? { backgroundColor: theme.accent, borderColor: theme.accent }
+                  : { borderColor: theme.textSecondary, backgroundColor: theme.background },
+              ]}>
+              {todo.completed && <ThemedText style={styles.checkmark}>✓</ThemedText>}
+            </View>
 
-        <View style={styles.contentColumn}>
-          <ThemedText
-            style={[
-              styles.title,
-              todo.completed && {
-                textDecorationLine: 'line-through',
-                color: theme.textSecondary,
-              },
+            <View style={styles.contentColumn}>
+              <ThemedText
+                style={[
+                  styles.title,
+                  todo.completed && {
+                    textDecorationLine: 'line-through',
+                    color: theme.textSecondary,
+                  },
+                ]}>
+                {todo.title}
+              </ThemedText>
+
+              <View style={styles.metaRow}>
+                <View style={[styles.categoryPill, { backgroundColor: theme.accentSoft }]}>
+                  <ThemedText style={[styles.categoryText, { color: theme.accent }]}>
+                    {todo.category}
+                  </ThemedText>
+                </View>
+
+                <View style={[styles.priorityPill, { backgroundColor: priorityStyle.bg }]}>
+                  <ThemedText style={[styles.priorityText, { color: priorityStyle.text }]}>
+                    {priorityStyle.label}
+                  </ThemedText>
+                </View>
+              </View>
+            </View>
+          </Pressable>
+
+          <Pressable
+            onPress={handleDelete}
+            hitSlop={12}
+            accessibilityRole="button"
+            accessibilityLabel={`Delete "${todo.title}"`}
+            style={({ pressed }) => [
+              styles.deleteButton,
+              { backgroundColor: theme.backgroundSelected },
+              pressed && styles.pressed,
             ]}>
-            {todo.title}
-          </ThemedText>
-
-          <View style={styles.metaRow}>
-            <View style={[styles.categoryPill, { backgroundColor: theme.accentSoft }]}>
-              <ThemedText style={[styles.categoryText, { color: theme.accent }]}>
-                {todo.category}
-              </ThemedText>
-            </View>
-
-            <View style={[styles.priorityPill, { backgroundColor: priorityStyle.bg }]}>
-              <ThemedText style={[styles.priorityText, { color: priorityStyle.text }]}>
-                {priorityStyle.label}
-              </ThemedText>
-            </View>
-          </View>
-        </View>
-      </Pressable>
-
-      <Pressable
-        onPress={() => onDelete(todo.id)}
-        hitSlop={10}
-        accessibilityRole="button"
-        accessibilityLabel={`Delete "${todo.title}"`}
-        style={({ pressed }) => [
-          styles.deleteButton,
-          { backgroundColor: theme.backgroundSelected },
-          pressed && styles.pressed,
-        ]}>
-        <ThemedText style={[styles.deleteIcon, { color: theme.textSecondary }]}>✕</ThemedText>
-      </Pressable>
-    </ThemedView>
+            <ThemedText style={[styles.deleteIcon, { color: theme.textSecondary }]}>✕</ThemedText>
+          </Pressable>
+        </ThemedView>
+      </Swipeable>
+    </Animated.View>
   );
 }
 
 const styles = StyleSheet.create({
+  swipeContainer: {
+    borderRadius: Spacing.three,
+    overflow: 'hidden',
+  },
+  swipeAction: {
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: Spacing.four,
+    borderRadius: Spacing.three,
+  },
+  leftAction: {
+    marginRight: Spacing.two,
+  },
+  rightAction: {
+    marginLeft: Spacing.two,
+  },
+  swipeActionText: {
+    color: '#FFFFFF',
+    fontSize: 13,
+    fontWeight: '700',
+  },
   card: {
     flexDirection: 'row',
     alignItems: 'center',

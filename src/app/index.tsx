@@ -20,6 +20,9 @@ import { TodoCategory, TodoPriority, useTodos } from '@/hooks/use-todos';
 import { useTheme } from '@/hooks/use-theme';
 
 const CATEGORIES: TodoCategory[] = ['Personal', 'Work', 'Errands'];
+const STATUS_FILTERS = ['All', 'Active', 'Completed'] as const;
+type StatusFilter = (typeof STATUS_FILTERS)[number];
+
 const PRIORITIES: { value: TodoPriority; label: string }[] = [
   { value: 'low', label: 'Low' },
   { value: 'medium', label: 'Medium' },
@@ -28,17 +31,32 @@ const PRIORITIES: { value: TodoPriority; label: string }[] = [
 
 export default function ActiveTasksScreen() {
   const theme = useTheme();
-  const { activeTodos, completedTodos, todos, addTodo, toggleTodo, deleteTodo } = useTodos();
+  const {
+    activeTodos,
+    completedTodos,
+    todos,
+    addTodo,
+    toggleTodo,
+    deleteTodo,
+    clearCompleted,
+  } = useTodos();
 
   const [title, setTitle] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<TodoCategory>('Personal');
   const [selectedPriority, setSelectedPriority] = useState<TodoPriority>('medium');
+  const [filterStatus, setFilterStatus] = useState<StatusFilter>('Active');
   const [filterCategory, setFilterCategory] = useState<'All' | TodoCategory>('All');
 
-  const filteredActiveTodos = useMemo(() => {
-    if (filterCategory === 'All') return activeTodos;
-    return activeTodos.filter((todo) => todo.category === filterCategory);
-  }, [activeTodos, filterCategory]);
+  const filteredTodos = useMemo(() => {
+    const baseList =
+      filterStatus === 'All'
+        ? todos
+        : filterStatus === 'Active'
+          ? activeTodos
+          : completedTodos;
+    if (filterCategory === 'All') return baseList;
+    return baseList.filter((todo) => todo.category === filterCategory);
+  }, [todos, activeTodos, completedTodos, filterStatus, filterCategory]);
 
   const completionPercent =
     todos.length > 0 ? Math.round((completedTodos.length / todos.length) * 100) : 0;
@@ -56,7 +74,7 @@ export default function ActiveTasksScreen() {
           style={styles.keyboardContainer}
           behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
           <FlatList
-            data={filteredActiveTodos}
+            data={filteredTodos}
             keyExtractor={(item) => item.id}
             contentContainerStyle={styles.listContent}
             keyboardShouldPersistTaps="handled"
@@ -77,7 +95,7 @@ export default function ActiveTasksScreen() {
                       <ThemedText type="small" themeColor="textSecondary">
                         {activeTodos.length === 0
                           ? 'All caught up for today!'
-                          : `${activeTodos.length} active task${activeTodos.length === 1 ? '' : 's'} remaining`}
+                          : `${activeTodos.length} task${activeTodos.length === 1 ? '' : 's'} remaining`}
                       </ThemedText>
                     </View>
                   </View>
@@ -205,9 +223,60 @@ export default function ActiveTasksScreen() {
                   </View>
                 </ThemedView>
 
+                {/* Status Filter Bar & Task Counter */}
+                <ThemedView
+                  type="backgroundElement"
+                  style={[styles.statusFilterBar, { borderColor: theme.border }]}>
+                  <View style={styles.statusFilterPills}>
+                    {STATUS_FILTERS.map((status) => {
+                      const active = filterStatus === status;
+                      return (
+                        <Pressable
+                          key={status}
+                          onPress={() => setFilterStatus(status)}
+                          style={[
+                            styles.statusChip,
+                            {
+                              backgroundColor: active ? theme.accent : theme.background,
+                              borderColor: active ? theme.accent : theme.border,
+                            },
+                          ]}>
+                          <ThemedText
+                            style={[
+                              styles.filterChipText,
+                              { color: active ? '#FFFFFF' : theme.textSecondary },
+                            ]}>
+                            {status}
+                          </ThemedText>
+                        </Pressable>
+                      );
+                    })}
+                  </View>
+
+                  <View style={styles.counterRow}>
+                    <ThemedText type="small" themeColor="textSecondary">
+                      {`${activeTodos.length} task${activeTodos.length === 1 ? '' : 's'} remaining`}
+                    </ThemedText>
+                    {completedTodos.length > 0 && (
+                      <Pressable
+                        onPress={clearCompleted}
+                        accessibilityRole="button"
+                        accessibilityLabel="Clear completed tasks"
+                        style={({ pressed }) => [
+                          styles.clearCompletedBtn,
+                          pressed && styles.pressed,
+                        ]}>
+                        <ThemedText type="smallBold" style={{ color: theme.accent }}>
+                          Clear completed
+                        </ThemedText>
+                      </Pressable>
+                    )}
+                  </View>
+                </ThemedView>
+
                 {/* Category Filter Pills */}
                 <View style={styles.filterHeaderRow}>
-                  <ThemedText type="smallBold">Active Tasks</ThemedText>
+                  <ThemedText type="smallBold">{filterStatus} Tasks</ThemedText>
                   <View style={styles.filterPills}>
                     {(['All', ...CATEGORIES] as const).map((cat) => {
                       const active = filterCategory === cat;
@@ -246,15 +315,26 @@ export default function ActiveTasksScreen() {
               <ThemedView
                 type="backgroundElement"
                 style={[styles.emptyCard, { borderColor: theme.border }]}>
+                <View style={[styles.emptyIconBadge, { backgroundColor: theme.accentSoft }]}>
+                  <ThemedText style={[styles.emptyIconText, { color: theme.accent }]}>
+                    {filterStatus === 'Completed' ? '✨' : '✓'}
+                  </ThemedText>
+                </View>
                 <ThemedText type="smallBold" style={styles.emptyTitle}>
-                  {filterCategory === 'All'
-                    ? 'No active tasks left!'
-                    : `No active tasks in ${filterCategory}`}
+                  {filterStatus === 'Completed'
+                    ? filterCategory === 'All'
+                      ? 'No completed tasks yet'
+                      : `No completed tasks in ${filterCategory}`
+                    : filterCategory === 'All'
+                      ? 'All caught up! Add a task below.'
+                      : `No ${filterStatus.toLowerCase()} tasks in ${filterCategory}`}
                 </ThemedText>
                 <ThemedText type="small" themeColor="textSecondary" style={styles.emptySubtitle}>
-                  Add a new task above or check your completed milestones.
+                  {filterStatus === 'Completed'
+                    ? 'Swipe right or tap a task checkbox to mark it complete.'
+                    : 'All caught up! Add a task below or swipe tasks to complete or delete them.'}
                 </ThemedText>
-                {completedTodos.length > 0 && (
+                {completedTodos.length > 0 && filterStatus !== 'Completed' && (
                   <Pressable
                     onPress={() => router.push('/explore')}
                     style={({ pressed }) => [
@@ -383,6 +463,34 @@ const styles = StyleSheet.create({
     lineHeight: 16,
     fontWeight: '600',
   },
+  statusFilterBar: {
+    padding: Spacing.three,
+    borderRadius: Spacing.three,
+    borderWidth: 1,
+    gap: Spacing.two,
+  },
+  statusFilterPills: {
+    flexDirection: 'row',
+    gap: Spacing.two,
+  },
+  statusChip: {
+    flex: 1,
+    paddingVertical: 6,
+    borderRadius: Spacing.three,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  counterRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingTop: 2,
+  },
+  clearCompletedBtn: {
+    paddingVertical: 2,
+    paddingHorizontal: Spacing.one,
+  },
   filterHeaderRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -417,6 +525,19 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: Spacing.two,
     marginTop: Spacing.two,
+  },
+  emptyIconBadge: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: Spacing.one,
+  },
+  emptyIconText: {
+    fontSize: 22,
+    fontWeight: '700',
+    lineHeight: 26,
   },
   emptyTitle: {
     textAlign: 'center',
