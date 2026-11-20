@@ -14,6 +14,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
+import { ProgressCelebration } from '@/components/progress-celebration';
 import { TodoItem } from '@/components/todo-item';
 import { BottomTabInset, MaxContentWidth, Spacing } from '@/constants/theme';
 import { TodoCategory, TodoPriority, useTodos } from '@/hooks/use-todos';
@@ -39,6 +40,7 @@ export default function ActiveTasksScreen() {
     toggleTodo,
     deleteTodo,
     clearCompleted,
+    isLoaded,
   } = useTodos();
 
   const [title, setTitle] = useState('');
@@ -112,6 +114,12 @@ export default function ActiveTasksScreen() {
                     </ThemedText>
                   </Pressable>
                 </View>
+
+                <ProgressCelebration
+                  done={completedTodos.length}
+                  total={todos.length}
+                  isLoaded={isLoaded}
+                />
 
                 {/* New Task Composer Card */}
                 <ThemedView
