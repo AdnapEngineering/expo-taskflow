@@ -36,39 +36,17 @@ interface TodoRow {
 const DB_NAME = 'taskflow.db';
 const WEB_STORAGE_KEY = 'taskflow-todos-v1';
 
+// Bump when the seed contents change; PRAGMA user_version records which seed ran.
+const SEED_VERSION = 1;
+
 const INITIAL_TODOS: Todo[] = [
   {
     id: 'starter-1',
-    title: 'Plan weekly sprint goals in TaskFlow',
-    completed: false,
-    priority: 'high',
-    category: 'Work',
-    createdAt: Date.now() - 1000 * 60 * 90,
-  },
-  {
-    id: 'starter-2',
-    title: 'Pick up fresh coffee beans & groceries',
+    title: 'Open TaskFlow and view todos',
     completed: false,
     priority: 'medium',
-    category: 'Errands',
-    createdAt: Date.now() - 1000 * 60 * 60,
-  },
-  {
-    id: 'starter-3',
-    title: 'Evening 20-minute stretch & reading',
-    completed: false,
-    priority: 'low',
     category: 'Personal',
-    createdAt: Date.now() - 1000 * 60 * 30,
-  },
-  {
-    id: 'starter-4',
-    title: 'Set up TaskFlow custom icon and SQLite database',
-    completed: true,
-    priority: 'high',
-    category: 'Work',
-    createdAt: Date.now() - 1000 * 60 * 180,
-    completedAt: Date.now() - 1000 * 60 * 15,
+    createdAt: Date.now(),
   },
 ];
 
@@ -124,25 +102,31 @@ async function initAndLoadTodos(): Promise<Todo[]> {
 
   try {
     const db = await getDatabase();
-    const countRow = await db.getFirstAsync<{ count: number }>(
-      'SELECT COUNT(*) as count FROM todos'
-    );
+    const versionRow = await db.getFirstAsync<{ user_version: number }>('PRAGMA user_version');
 
-    if (!countRow || countRow.count === 0) {
-      for (const todo of INITIAL_TODOS) {
-        await db.runAsync(
-          `INSERT OR REPLACE INTO todos (id, title, completed, priority, category, created_at, completed_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?)`,
-          todo.id,
-          todo.title,
-          todo.completed ? 1 : 0,
-          todo.priority,
-          todo.category,
-          todo.createdAt,
-          todo.completedAt ?? null
-        );
-      }
-      return INITIAL_TODOS;
+    // Seed exactly once per install. An empty table later means the user cleared it.
+    if ((versionRow?.user_version ?? 0) < SEED_VERSION) {
+      const countRow = await db.getFirstAsync<{ count: number }>(
+        'SELECT COUNT(*) as count FROM todos'
+      );
+      await db.withTransactionAsync(async () => {
+        if (!countRow || countRow.count === 0) {
+          for (const todo of INITIAL_TODOS) {
+            await db.runAsync(
+              `INSERT OR REPLACE INTO todos (id, title, completed, priority, category, created_at, completed_at)
+               VALUES (?, ?, ?, ?, ?, ?, ?)`,
+              todo.id,
+              todo.title,
+              todo.completed ? 1 : 0,
+              todo.priority,
+              todo.category,
+              todo.createdAt,
+              todo.completedAt ?? null
+            );
+          }
+        }
+        await db.execAsync(`PRAGMA user_version = ${SEED_VERSION}`);
+      });
     }
 
     const rows = await db.getAllAsync<TodoRow>(
@@ -151,7 +135,7 @@ async function initAndLoadTodos(): Promise<Todo[]> {
     return rows.map(rowToTodo);
   } catch (err) {
     console.warn('Failed to load todos from SQLite:', err);
-    return INITIAL_TODOS;
+    return [];
   }
 }
 
@@ -179,8 +163,8 @@ interface TodoContextValue {
 const TodoContext = createContext<TodoContextValue | null>(null);
 
 export function TodoProvider({ children }: { children: React.ReactNode }) {
-  const [todos, setTodos] = useState<Todo[]>(INITIAL_TODOS);
-  const todosRef = useRef(INITIAL_TODOS);
+  const [todos, setTodos] = useState<Todo[]>([]);
+  const todosRef = useRef<Todo[]>([]);
   const [isLoaded, setIsLoaded] = useState(false);
 
   const updateTodos = useCallback((update: (current: Todo[]) => Todo[]) => {
