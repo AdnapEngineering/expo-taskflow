@@ -62,6 +62,12 @@
         "projectId": "e73b1d1e-bb54-4a0f-bfc3-83c9467f81aa"
       }
     },
-    "owner": "adnapengineering"
+    "owner": "adnapengineering",
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/e73b1d1e-bb54-4a0f-bfc3-83c9467f81aa"
+    }
   }
 }
